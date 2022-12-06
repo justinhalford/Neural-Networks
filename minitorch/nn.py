@@ -4,7 +4,7 @@ from . import operators
 from .autodiff import Context
 from .fast_ops import FastOps
 from .tensor import Tensor
-from .tensor_functions import Function, rand, tensor
+from .tensor_functions import Function, rand  # , tensor
 
 
 def tile(input: Tensor, kernel: Tuple[int, int]) -> Tuple[Tensor, int, int]:
@@ -24,7 +24,16 @@ def tile(input: Tensor, kernel: Tuple[int, int]) -> Tuple[Tensor, int, int]:
     assert height % kh == 0
     assert width % kw == 0
     # TODO: Implement for Task 4.3.
-    raise NotImplementedError("Need to implement for Task 4.3")
+    new_height = height // kh
+    new_width = width // kw
+    size = kh * kw
+    viewDims = 5
+    bDim, cDim, n_hDim, khDim, n_wDim, kwDim = [i for i in range(viewDims + 1)]
+    output = input.contiguous().view(batch, channel, new_height, kh, new_width, kw)
+    output = output.permute(bDim, cDim, n_hDim, n_wDim, khDim, kwDim)
+    output = output.contiguous().view(batch, channel, new_height, new_width, size)
+    return output, new_height, new_width
+    # raise NotImplementedError("Need to implement for Task 4.3")
 
 
 def avgpool2d(input: Tensor, kernel: Tuple[int, int]) -> Tensor:
@@ -40,7 +49,17 @@ def avgpool2d(input: Tensor, kernel: Tuple[int, int]) -> Tensor:
     """
     batch, channel, height, width = input.shape
     # TODO: Implement for Task 4.3.
-    raise NotImplementedError("Need to implement for Task 4.3")
+    dim = 4
+    assert (
+        batch is not None
+        and channel is not None
+        and height is not None
+        and width is not None
+    )
+    input, h, w = tile(input, kernel)
+    input = input.sum(dim) / input.shape[dim]
+    return input.view(batch, channel, h, w)
+    # raise NotImplementedError("Need to implement for Task 4.3")
 
 
 max_reduce = FastOps.reduce(operators.max, -1e9)
@@ -68,13 +87,18 @@ class Max(Function):
     def forward(ctx: Context, input: Tensor, dim: Tensor) -> Tensor:
         "Forward of max should be max reduction"
         # TODO: Implement for Task 4.4.
-        raise NotImplementedError("Need to implement for Task 4.4")
+        out = max_reduce(input, int(dim.item()))
+        ctx.save_for_backward(argmax(input, int(dim.item())))
+        return out
+        # raise NotImplementedError("Need to implement for Task 4.4")
 
     @staticmethod
     def backward(ctx: Context, grad_output: Tensor) -> Tuple[Tensor, float]:
         "Backward of max should be argmax (see above)"
         # TODO: Implement for Task 4.4.
-        raise NotImplementedError("Need to implement for Task 4.4")
+        (x,) = ctx.saved_values
+        return (x * grad_output, 0.0)
+        # raise NotImplementedError("Need to implement for Task 4.4")
 
 
 def max(input: Tensor, dim: int) -> Tensor:
@@ -97,7 +121,8 @@ def softmax(input: Tensor, dim: int) -> Tensor:
         softmax tensor
     """
     # TODO: Implement for Task 4.4.
-    raise NotImplementedError("Need to implement for Task 4.4")
+    return input.exp() / input.exp().sum(dim)
+    # raise NotImplementedError("Need to implement for Task 4.4")
 
 
 def logsoftmax(input: Tensor, dim: int) -> Tensor:
@@ -116,7 +141,8 @@ def logsoftmax(input: Tensor, dim: int) -> Tensor:
          log of softmax tensor
     """
     # TODO: Implement for Task 4.4.
-    raise NotImplementedError("Need to implement for Task 4.4")
+    return (input.exp() / input.exp().sum(dim)).log()
+    # raise NotImplementedError("Need to implement for Task 4.4")
 
 
 def maxpool2d(input: Tensor, kernel: Tuple[int, int]) -> Tensor:
@@ -132,7 +158,10 @@ def maxpool2d(input: Tensor, kernel: Tuple[int, int]) -> Tensor:
     """
     batch, channel, height, width = input.shape
     # TODO: Implement for Task 4.4.
-    raise NotImplementedError("Need to implement for Task 4.4")
+    input, height, width = tile(input, kernel)
+    input = max(input, 4)
+    return input.view(batch, channel, height, width)
+    # raise NotImplementedError("Need to implement for Task 4.4")
 
 
 def dropout(input: Tensor, rate: float, ignore: bool = False) -> Tensor:
@@ -148,4 +177,8 @@ def dropout(input: Tensor, rate: float, ignore: bool = False) -> Tensor:
         tensor with randoom positions dropped out
     """
     # TODO: Implement for Task 4.4.
-    raise NotImplementedError("Need to implement for Task 4.4")
+    if not ignore:
+        return input * (rand(input.shape) > rate)
+    else:
+        return input
+    # raise NotImplementedError("Need to implement for Task 4.4")

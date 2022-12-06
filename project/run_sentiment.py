@@ -35,7 +35,8 @@ class Conv1d(minitorch.Module):
 
     def forward(self, input):
         # TODO: Implement for Task 4.5.
-        raise NotImplementedError("Need to implement for Task 4.5")
+        return minitorch.fast_conv.conv1d(input, self.weights.value) + self.bias.value
+        # raise NotImplementedError("Need to implement for Task 4.5")
 
 
 class CNNSentimentKim(minitorch.Module):
@@ -62,14 +63,22 @@ class CNNSentimentKim(minitorch.Module):
         super().__init__()
         self.feature_map_size = feature_map_size
         # TODO: Implement for Task 4.5.
-        raise NotImplementedError("Need to implement for Task 4.5")
+        self.mid = Conv1d(embedding_size, feature_map_size, filter_sizes)
+        # self.l1 = Linear(, C)
+        # raise NotImplementedError("Need to implement for Task 4.5")
 
     def forward(self, embeddings):
         """
         embeddings tensor: [batch x sentence length x embedding dim]
         """
         # TODO: Implement for Task 4.5.
-        raise NotImplementedError("Need to implement for Task 4.5")
+        embeddings = self.mid(embeddings).relu()
+        # Apply max-over-time across each feature map
+        if self.training:
+            embeddings = minitorch.nn.dropout(embeddings, self.dropout)
+
+        return embeddings
+        # raise NotImplementedError("Need to implement for Task 4.5")
 
 
 # Evaluation helper methods

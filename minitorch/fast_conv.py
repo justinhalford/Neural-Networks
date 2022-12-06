@@ -1,13 +1,11 @@
 from typing import Tuple
 
-import numpy as np
+# import numpy as np
 from numba import njit, prange
 
 from .autodiff import Context
 from .tensor import Tensor
-from .tensor_data import (
-    MAX_DIMS,
-    Index,
+from .tensor_data import (  # MAX_DIMS,; Index,
     Shape,
     Strides,
     broadcast_index,
@@ -81,7 +79,24 @@ def _tensor_conv1d(
     s2 = weight_strides
 
     # TODO: Implement for Task 4.1.
-    raise NotImplementedError("Need to implement for Task 4.1")
+    for i in prange(out_size):
+        out_index = out_shape.copy()
+        to_index(i, out_shape, out_index)
+        out_position = index_to_position(out_index, out_strides)
+        b, c, w = out_index
+        z = [
+            (_channel_, _width_)
+            for _channel_ in prange(in_channels)
+            for _width_ in prange(kw)
+        ]
+        for j, k in z:
+            l_ = w - k if reverse else w + k
+            if l_ >= 0 and l_ <= width - 1:
+                out[out_position] += (
+                    weight[index_to_position([c, j, k], s2)]
+                    * input[index_to_position([b, j, l_], s1)]
+                )
+    # raise NotImplementedError("Need to implement for Task 4.1")
 
 
 tensor_conv1d = njit(parallel=True)(_tensor_conv1d)
@@ -202,12 +217,28 @@ def _tensor_conv2d(
 
     s1 = input_strides
     s2 = weight_strides
-    # inners
-    s10, s11, s12, s13 = s1[0], s1[1], s1[2], s1[3]
-    s20, s21, s22, s23 = s2[0], s2[1], s2[2], s2[3]
 
     # TODO: Implement for Task 4.2.
-    raise NotImplementedError("Need to implement for Task 4.2")
+    for i in prange(out_size):
+        out_index = out_shape.copy()
+        to_index(i, out_shape, out_index)
+        out_position = index_to_position(out_index, out_strides)
+        b, c, h, w = out_index
+        z = [
+            (_channel_, _h_, _w_)
+            for _channel_ in prange(in_channels)
+            for _h_ in prange(kh)
+            for _w_ in prange(kw)
+        ]
+        for j, k, l in z:
+            h_ = h - k if reverse else h + k
+            w_ = w - l if reverse else w + l
+            if h_ >= 0 and h_ <= height - 1 and w_ >= 0 and w_ <= width - 1:
+                out[out_position] += (
+                    weight[index_to_position([c, j, k, l], s2)]
+                    * input[index_to_position([b, j, h_, w_], s1)]
+                )
+    # raise NotImplementedError("Need to implement for Task 4.2")
 
 
 tensor_conv2d = njit(parallel=True, fastmath=True)(_tensor_conv2d)

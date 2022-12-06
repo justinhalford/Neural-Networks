@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     from typing import Callable, Optional
 
     from .tensor import Tensor
-    from .tensor_data import Index, Shape, Storage, Strides
+    from .tensor_data import Shape, Storage, Strides  # , Index
 
 # TIP: Use `NUMBA_DISABLE_JIT=1 pytest tests/ -m task3_1` to run these tests without JIT.
 
@@ -159,7 +159,33 @@ def tensor_map(
         in_shape: Shape,
         in_strides: Strides,
     ) -> None:
-        raise NotImplementedError("Need to include this file from past assignment.")
+        # TODO: Implement for Task 3.1.
+        strideLenComp = len(in_strides) == len(out_strides)
+        if strideLenComp:
+            shapeComp = (in_shape == out_shape).all()
+            strideComp = (in_strides == out_strides).all() and len(in_strides) == len(
+                out_strides
+            )
+            # When `out` and `in` are stride-aligned, avoid indexing
+            if shapeComp and strideComp:
+                # Main loop in parallel
+                for i in prange(len(out)):
+                    out[i] = fn(in_storage[i])
+                return
+        # When `out` and `in` are not stride-aligned
+        # Main loop in parallel
+        for i in prange(len(out)):
+            # All indices use numpy buffers
+            in_index, out_index = np.empty(MAX_DIMS, np.int32), np.empty(
+                MAX_DIMS, np.int32
+            )
+            to_index(i, out_shape, out_index)
+            broadcast_index(out_index, out_shape, in_shape, in_index)
+            in_position = index_to_position(in_index, in_strides)
+            out_position = index_to_position(out_index, out_strides)
+            result = fn(in_storage[in_position])
+            out[out_position] = result
+        # raise NotImplementedError("Need to implement for Task 3.1")
 
     return njit(parallel=True)(_map)  # type: ignore
 
@@ -197,7 +223,38 @@ def tensor_zip(
         b_shape: Shape,
         b_strides: Strides,
     ) -> None:
-        raise NotImplementedError("Need to include this file from past assignment.")
+        # TODO: Implement for Task 3.1.
+        strideLenComp = len(a_strides) == len(out_strides) and len(b_strides) == len(
+            out_strides
+        )
+        if strideLenComp:
+            strideComp = (a_strides == out_strides).all() and (
+                b_strides == out_strides
+            ).all()
+            shapeComp = (a_shape == out_shape).all() and (b_shape == out_shape).all()
+            # When `out`, `a`, `b` are stride-aligned, avoid indexing
+            if strideComp and shapeComp:
+                # Main loop in parallel
+                for i in prange(len(out)):
+                    out[i] = fn(a_storage[i], b_storage[i])
+                return
+        # When `out`, `a`, `b` are not stride-aligned
+        # Main loop in parallel
+        for i in prange(len(out)):
+            # All indices use numpy buffers
+            a_index, b_index, out_index = (
+                np.empty(MAX_DIMS, np.int32),
+                np.empty(MAX_DIMS, np.int32),
+                np.empty(MAX_DIMS, np.int32),
+            )
+            to_index(i, out_shape, out_index)
+            broadcast_index(out_index, out_shape, a_shape, a_index)
+            broadcast_index(out_index, out_shape, b_shape, b_index)
+            a_position = index_to_position(a_index, a_strides)
+            b_position = index_to_position(b_index, b_strides)
+            out_position = index_to_position(out_index, out_strides)
+            out[out_position] = fn(a_storage[a_position], b_storage[b_position])
+        # raise NotImplementedError("Need to implement for Task 3.1")
 
     return njit(parallel=True)(_zip)  # type: ignore
 
@@ -230,7 +287,23 @@ def tensor_reduce(
         a_strides: Strides,
         reduce_dim: int,
     ) -> None:
-        raise NotImplementedError("Need to include this file from past assignment.")
+        # TODO: Implement for Task 3.1.
+        # Main loop in parallel
+        for i in prange(len(out)):
+            # All indices use numpy buffers
+            out_index = np.empty(MAX_DIMS, np.int32)
+            to_index(i, out_shape, out_index)
+            a_index = out_index
+            out_position = index_to_position(out_index, out_strides)
+            for j in range(a_shape[reduce_dim]):
+                a_index[reduce_dim] = j
+                a_position = index_to_position(a_index, a_strides)
+                out[out_position] = (
+                    fn(out[out_position], a_storage[a_position])
+                    if j != 0
+                    else a_storage[a_position]
+                )
+        # raise NotImplementedError("Need to implement for Task 3.1")
 
     return njit(parallel=True)(_reduce)  # type: ignore
 
@@ -276,10 +349,32 @@ def _tensor_matrix_multiply(
     Returns:
         None : Fills in `out`
     """
-    a_batch_stride = a_strides[0] if a_shape[0] > 1 else 0
-    b_batch_stride = b_strides[0] if b_shape[0] > 1 else 0
+    # a_batch_stride = a_strides[0] if a_shape[0] > 1 else 0
+    # b_batch_stride = b_strides[0] if b_shape[0] > 1 else 0
 
-    raise NotImplementedError("Need to include this file from past assignment.")
+    # TODO: Implement for Task 3.2.
+    x, y = -1, -2
+    assert a_shape[x] == b_shape[y]
+    # Outer loop in parallel
+    for i in prange(len(out)):
+        out_index = out_shape.copy()
+        to_index(i, out_shape, out_index)
+        out_position = index_to_position(out_index, out_strides)
+        for j in prange(a_shape[-1]):
+            a_, b_, a__, b__ = (
+                out_index.copy(),
+                out_index.copy(),
+                a_shape.copy(),
+                b_shape.copy(),
+            )
+            a_[x], b_[y] = j, j
+            broadcast_index(a_, out_shape, a_shape, a__)
+            a_position = index_to_position(a__, a_strides)
+            broadcast_index(b_, out_shape, b_shape, b__)
+            b_position = index_to_position(b__, b_strides)
+            a_comp, b_comp = a_storage[a_position], b_storage[b_position]
+            out[out_position] += a_comp * b_comp
+    # raise NotImplementedError("Need to implement for Task 3.2")
 
 
 tensor_matrix_multiply = njit(parallel=True, fastmath=True)(_tensor_matrix_multiply)
