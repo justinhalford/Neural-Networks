@@ -35,7 +35,7 @@ class Conv1d(minitorch.Module):
 
     def forward(self, input):
         # TODO: Implement for Task 4.5.
-        return minitorch.fast_conv.conv1d(input, self.weights.value) + self.bias.value
+        return minitorch.conv1d(input, self.weights.value) + self.bias.value
         # raise NotImplementedError("Need to implement for Task 4.5")
 
 
@@ -63,8 +63,11 @@ class CNNSentimentKim(minitorch.Module):
         super().__init__()
         self.feature_map_size = feature_map_size
         # TODO: Implement for Task 4.5.
-        self.mid = Conv1d(embedding_size, feature_map_size, filter_sizes)
-        # self.l1 = Linear(, C)
+        self.fs1 = Conv1d(embedding_size, feature_map_size, filter_sizes[0])
+        self.fs2 = Conv1d(embedding_size, feature_map_size, filter_sizes[1])
+        self.fs3 = Conv1d(embedding_size, feature_map_size, filter_sizes[2])
+        self.l1 = Linear(feature_map_size, 1)
+        self.d = dropout
         # raise NotImplementedError("Need to implement for Task 4.5")
 
     def forward(self, embeddings):
@@ -72,12 +75,21 @@ class CNNSentimentKim(minitorch.Module):
         embeddings tensor: [batch x sentence length x embedding dim]
         """
         # TODO: Implement for Task 4.5.
-        embeddings = self.mid(embeddings).relu()
-        # Apply max-over-time across each feature map
+        x = embeddings.permute(0, 2, 1)
+        x1 = self.fs1.forward(x).relu()
+        a, b, c = x1.shape
+        x1 = x1.view(a, b, 1, c)
+        x2 = self.fs2.forward(x).relu().view(a, b, 1, c)
+        x3 = self.fs3.forward(x).relu().view(a, b, 1, c)
+        x = (
+            minitorch.maxpool2d(x1, (1, c))
+            + minitorch.maxpool2d(x2, (1, c))
+            + minitorch.maxpool2d(x3, (1, c))
+        ).view(a, b)
+        x = self.l1.forward(x).relu()
         if self.training:
-            embeddings = minitorch.nn.dropout(embeddings, self.dropout)
-
-        return embeddings
+            x = minitorch.nn.dropout(x, self.d)
+        return x.sigmoid().view(embeddings.shape[0])
         # raise NotImplementedError("Need to implement for Task 4.5")
 
 

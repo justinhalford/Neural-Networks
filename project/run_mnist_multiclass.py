@@ -65,8 +65,8 @@ class Network(minitorch.Module):
         super().__init__()
 
         # For vis
-        self.mid = None
-        self.out = None
+        # self.mid = None
+        # self.out = None
 
         # TODO: Implement for Task 4.5.
         self.mid = Conv2d(1, 4, 3, 3)
@@ -77,9 +77,11 @@ class Network(minitorch.Module):
 
     def forward(self, x):
         # TODO: Implement for Task 4.5.
-        x = self.mid(x).relu().out(x).relu()
-        x = minitorch.nn.maxpool2d(x, [4, 4])
-        x = x.view(x.size // 392, 392).l1(x).relu()
+        x = self.mid.forward(x).relu()
+        x = self.out.forward(x).relu()
+        x = minitorch.nn.maxpool2d(x, (4, 4))
+        x = x.view(x.size // 392, 392)
+        x = self.l1(x).relu()
         if self.training:
             x = minitorch.nn.dropout(x, 0.25)
         x = self.l2(x)
@@ -111,7 +113,7 @@ class ImageTrain:
         return self.model.forward(minitorch.tensor([x], backend=BACKEND))
 
     def train(
-        self, data_train, data_val, learning_rate, max_epochs=500, log_fn=default_log_fn
+        self, data_train, data_val, learning_rate, max_epochs=25, log_fn=default_log_fn
     ):
         (X_train, y_train) = data_train
         (X_val, y_val) = data_val

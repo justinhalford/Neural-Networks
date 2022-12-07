@@ -86,8 +86,8 @@ def _tensor_conv1d(
         b, c, w = out_index
         z = [
             (_channel_, _width_)
-            for _channel_ in prange(in_channels)
-            for _width_ in prange(kw)
+            for _channel_ in range(in_channels)
+            for _width_ in range(kw)
         ]
         for j, k in z:
             l_ = w - k if reverse else w + k
